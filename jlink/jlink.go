@@ -11,14 +11,17 @@ import (
 
 type JLink struct {
 	exePath string
+	serial  string
 	iface   string
 	speed   string
 	device  string
+	cmd     string
 }
 
-func NewJLink(exePath, iface, speed, device string) *JLink {
+func NewJLink(exePath, serial, iface, speed, device string) *JLink {
 	j := JLink{
 		exePath: exePath,
+		serial:  serial,
 		iface:   iface,
 		speed:   speed,
 		device:  device,
@@ -30,7 +33,25 @@ func NewJLink(exePath, iface, speed, device string) *JLink {
 func (j *JLink) LoadBin(binPath string, addr int) error {
 	var err error
 
-	cmd := exec.Command(j.exePath, "-if", j.iface, "-speed", j.speed, "-device", j.device)
+	var args []string
+
+	if j.serial != "" {
+		args = append(args, "-SelectEmuBySN")
+		args = append(args, j.serial)
+	}
+	if j.iface != "" {
+		args = append(args, "-if")
+		args = append(args, j.iface)
+	}
+	if j.speed != "" {
+		args = append(args, "-speed")
+		args = append(args, j.speed)
+	}
+	if j.device != "" {
+		args = append(args, "-device")
+		args = append(args, j.device)
+	}
+	cmd := exec.Command(j.exePath, args...)
 
 	iow, err := cmd.StdinPipe()
 	if err != nil {
@@ -95,7 +116,25 @@ func (j *JLink) LoadBin(binPath string, addr int) error {
 func (j *JLink) Erase() error {
 	var err error
 
-	cmd := exec.Command(j.exePath, "-if", j.iface, "-speed", j.speed, "-device", j.device)
+	var args []string
+
+	if j.serial != "" {
+		args = append(args, "-SelectEmuBySN")
+		args = append(args, j.serial)
+	}
+	if j.iface != "" {
+		args = append(args, "-if")
+		args = append(args, j.iface)
+	}
+	if j.speed != "" {
+		args = append(args, "-speed")
+		args = append(args, j.speed)
+	}
+	if j.device != "" {
+		args = append(args, "-device")
+		args = append(args, j.device)
+	}
+	cmd := exec.Command(j.exePath, args...)
 
 	iow, err := cmd.StdinPipe()
 	if err != nil {
@@ -160,7 +199,25 @@ func (j *JLink) Erase() error {
 func (j *JLink) Reset() error {
 	var err error
 
-	cmd := exec.Command(j.exePath, "-if", j.iface, "-speed", j.speed, "-device", j.device)
+	var args []string
+
+	if j.serial != "" {
+		args = append(args, "-SelectEmuBySN")
+		args = append(args, j.serial)
+	}
+	if j.iface != "" {
+		args = append(args, "-if")
+		args = append(args, j.iface)
+	}
+	if j.speed != "" {
+		args = append(args, "-speed")
+		args = append(args, j.speed)
+	}
+	if j.device != "" {
+		args = append(args, "-device")
+		args = append(args, j.device)
+	}
+	cmd := exec.Command(j.exePath, args...)
 
 	iow, err := cmd.StdinPipe()
 	if err != nil {
@@ -220,6 +277,92 @@ func (j *JLink) Reset() error {
 	}
 
 	return nil
+}
+
+func (j *JLink) GetEmuList() ([]string, error) {
+	var err error
+
+	var args []string
+
+	if j.serial != "" {
+		args = append(args, "-SelectEmuBySN")
+		args = append(args, j.serial)
+	}
+	if j.iface != "" {
+		args = append(args, "-if")
+		args = append(args, j.iface)
+	}
+	if j.speed != "" {
+		args = append(args, "-speed")
+		args = append(args, j.speed)
+	}
+	if j.device != "" {
+		args = append(args, "-device")
+		args = append(args, j.device)
+	}
+	cmd := exec.Command(j.exePath, args...)
+
+	iow, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	ior, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	iors := bufio.NewReader(ior)
+
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	defer cmd.Process.Kill()
+
+	_, err = io.WriteString(iow, "ShowEmuList\n")
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.WriteString(iow, "qc\n")
+	if err != nil {
+		return nil, err
+	}
+
+	var serials []string
+
+	for {
+		var l []byte
+
+		l, _, err = iors.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+
+		if containsError(string(l)) {
+			return nil, errors.New(string(l))
+		}
+
+		if strings.Contains(string(l), "Serial number: ") {
+			s := strings.Split(string(l), " ")
+			if s[3] == "Serial" && s[4] == "number:" {
+				serials = append(serials, strings.Trim(s[5], ","))
+			}
+			break
+		}
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(serials) == 0 {
+		return nil, errors.New("No emulator found")
+	}
+
+	return serials, nil
 }
 
 func containsError(s string) bool {

@@ -337,7 +337,7 @@ func (j *JLink) GetEmuList() ([]string, error) {
 
 		l, _, err = iors.ReadLine()
 		if err != nil {
-			return nil, err
+			break
 		}
 
 		if containsError(string(l)) {
@@ -349,7 +349,6 @@ func (j *JLink) GetEmuList() ([]string, error) {
 			if s[3] == "Serial" && s[4] == "number:" {
 				serials = append(serials, strings.Trim(s[5], ","))
 			}
-			break
 		}
 	}
 

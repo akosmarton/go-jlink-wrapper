@@ -2,7 +2,7 @@
 
 ## Installing
 ```bash
-go get -u github.com/akosmarton/go-jlink-wrapper/jlink
+go get github.com/akosmarton/go-jlink-wrapper/jlink
 ```
 
 ## Usage Example

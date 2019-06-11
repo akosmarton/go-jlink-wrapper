@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type JLink struct {
@@ -70,6 +71,8 @@ func (j *JLink) LoadBin(binPath string, addr int) error {
 		return err
 	}
 	defer cmd.Process.Kill()
+
+	time.Sleep(time.Millisecond * 500)
 
 	_, err = io.WriteString(iow, "loadbin "+binPath+","+strconv.Itoa(addr)+"\n")
 	if err != nil {
@@ -362,6 +365,64 @@ func (j *JLink) GetEmuList() ([]string, error) {
 	}
 
 	return serials, nil
+}
+
+func (j *JLink) Go(addr int) error {
+	var err error
+
+	var args []string
+
+	if j.serial != "" {
+		args = append(args, "-SelectEmuBySN")
+		args = append(args, j.serial)
+	}
+	if j.iface != "" {
+		args = append(args, "-if")
+		args = append(args, j.iface)
+	}
+	if j.speed != "" {
+		args = append(args, "-speed")
+		args = append(args, j.speed)
+	}
+	if j.device != "" {
+		args = append(args, "-device")
+		args = append(args, j.device)
+	}
+	cmd := exec.Command(j.exePath, args...)
+
+	iow, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+	defer cmd.Process.Kill()
+
+	_, err = io.WriteString(iow, "g "+strconv.Itoa(addr)+"\n")
+	if err != nil {
+		return err
+	}
+
+	_, err = io.WriteString(iow, "qc\n")
+	if err != nil {
+		return err
+	}
+
+	success := false
+
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+
+	if success == false {
+		return errors.New("Unknown error")
+	}
+
+	return nil
 }
 
 func containsError(s string) bool {
